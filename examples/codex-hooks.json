@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/ABSOLUTE/PATH/TO/terminal-title.sh",
+            "command": "/ABSOLUTE/PATH/TO/terminal-title.py",
             "timeout": 3
           }
         ]
