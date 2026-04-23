@@ -35,7 +35,7 @@ prefixed as `[C]` (Claude) or `[X]` (Codex) so you can tell sessions apart.
 ## Install
 
 ```bash
-git clone https://github.com/YOUR_USER/ai-terminal-title.git ~/.ai-terminal-title
+git clone https://github.com/Kibitz117/ai-terminal-title.git ~/.ai-terminal-title
 chmod +x ~/.ai-terminal-title/terminal-title.sh
 ```
 
