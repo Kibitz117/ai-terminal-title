@@ -20,15 +20,16 @@ Both Claude Code and Codex CLI fire a `UserPromptSubmit` hook before each
 turn and pass a JSON payload on `stdin` that includes the user's prompt.
 The hook:
 
-1. **Turn 1** → emits an instant deterministic title (first 60 chars of
-   your prompt, no LLM wait, no cost).
-2. **Every N turns after** (default `N=5`) → spawns a **detached
-   background worker** that rolls up the last N prompts, shells out to
-   `claude -p --model claude-haiku-4-5` or `codex exec --model gpt-5-mini`
-   for a summary, and updates the title when it returns. Hook itself
-   returns in <50ms so it never blocks your turn.
-3. **Off-cycle turns** → no-op (or deterministic every turn with
-   `AI_TITLE_EVERY_TURN=1`).
+1. **Turn 1 and every N turns after** (default `N=5`) → spawns a
+   **detached background worker** that rolls up the last N prompts, shells
+   out to `claude -p --model claude-haiku-4-5` or
+   `codex exec --model gpt-5-mini` for a summary, and writes the title
+   when it returns (~1-2s). The hook itself returns in <50ms so it never
+   blocks your turn.
+2. **Off-cycle turns** → no-op.
+3. **Fallback** → if the agent CLI isn't on `PATH` or the call errors
+   out, the worker falls back to a truncated latest prompt so you always
+   get *something*. Set `AI_TITLE_MODE=trunc` to skip the LLM entirely.
 
 The summary call uses the user's existing CLI auth, so there's **no extra
 configuration, no API key, no separate subscription**. Token cost falls on
@@ -142,17 +143,16 @@ Set via env vars in the hook's `command` line, e.g.:
 
 | Env var               | Default | Description                                          |
 | --------------------- | ------- | ---------------------------------------------------- |
-| `AI_TITLE_EVERY`      | `5`     | LLM rename cadence after turn 1.                     |
-| `AI_TITLE_MODE`       | `auto`  | `auto` (LLM if CLI found) \| `llm` \| `trunc`.       |
-| `AI_TITLE_MODEL`      | agent-specific | Override summarization model.                 |
-| `AI_TITLE_BUFFER`     | `8`     | Rolling prompt buffer size fed to the LLM.           |
-| `AI_TITLE_MAX`        | `60`    | Max characters in the emitted title.                 |
-| `AI_TITLE_PREFIX`     | (none)  | Literal string prepended to every title.             |
-| `AI_TITLE_NO_TAG`     | (unset) | Set to `1` to drop the `[C]`/`[X]` agent tag.        |
-| `AI_TITLE_EVERY_TURN` | (unset) | Set to `1` to rename deterministically every turn.   |
-| `AI_TITLE_DEBUG`      | (unset) | Set to `1` to append trace logs to `AI_TITLE_LOG`.   |
-| `AI_TITLE_LOG`        | `/tmp/ai-terminal-title.log` | Debug log path.                 |
-| `AI_TITLE_STATE_DIR`  | `~/.cache/ai-terminal-title` | Per-session state dir.          |
+| `AI_TITLE_EVERY`     | `5`     | LLM rename cadence after turn 1.                      |
+| `AI_TITLE_MODE`      | `auto`  | `auto` (LLM) \| `trunc` (deterministic, no LLM call). |
+| `AI_TITLE_MODEL`     | agent-specific | Override summarization model.                  |
+| `AI_TITLE_BUFFER`    | `8`     | Rolling prompt buffer size fed to the LLM.            |
+| `AI_TITLE_MAX`       | `60`    | Max characters in the emitted title.                  |
+| `AI_TITLE_PREFIX`    | (none)  | Literal string prepended to every title.              |
+| `AI_TITLE_NO_TAG`    | (unset) | Set to `1` to drop the `[C]`/`[X]` agent tag.         |
+| `AI_TITLE_DEBUG`     | (unset) | Set to `1` to append trace logs to `AI_TITLE_LOG`.    |
+| `AI_TITLE_LOG`       | `/tmp/ai-terminal-title.log` | Debug log path.                  |
+| `AI_TITLE_STATE_DIR` | `~/.cache/ai-terminal-title` | Per-session state dir.           |
 
 ## Smoke test
 

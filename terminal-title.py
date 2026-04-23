@@ -2,23 +2,25 @@
 """ai-terminal-title — UserPromptSubmit hook for Claude Code and OpenAI Codex CLI.
 
 Behavior:
-  Turn 1         → instant deterministic rename (truncate prompt, no LLM wait)
-  Turn 1 + k*N   → background LLM summary over the rolling prompt buffer
-  Other turns    → no-op (unless AI_TITLE_EVERY_TURN=1)
+  Turn 1, Turn 1 + k*N → background LLM summary over the rolling prompt buffer
+  Other turns          → no-op
+
+Turn 1 fires the LLM worker immediately, so the tab label arrives ~1-2s into
+the first response rather than stalling the user. If the LLM call fails or
+no agent CLI is on PATH, the worker falls back to a truncated latest prompt.
 
 Uses the coding agent's own CLI (`claude -p`, `codex exec`) so no API key is
 required — token cost falls on the user's existing subscription. Recursion into
 the hook from the summarizer call is blocked via AI_TITLE_INTERNAL=1.
 
 Env vars:
-  AI_TITLE_EVERY       rename cadence after turn 1 (default 5)
-  AI_TITLE_MODE        auto | llm | trunc (default auto → llm if CLI found)
+  AI_TITLE_EVERY       LLM rename cadence after turn 1 (default 5)
+  AI_TITLE_MODE        auto | trunc (default auto — LLM; trunc = deterministic)
   AI_TITLE_MODEL       override model; defaults: claude-haiku-4-5 | gpt-5-mini
   AI_TITLE_BUFFER      rolling prompt buffer size fed to the LLM (default 8)
   AI_TITLE_MAX         max title length (default 60)
   AI_TITLE_PREFIX      literal prefix prepended to every title
   AI_TITLE_NO_TAG      "1" disables the [C]/[X] agent tag
-  AI_TITLE_EVERY_TURN  "1" forces a deterministic rename on every off-cycle turn
   AI_TITLE_DEBUG       "1" appends trace logs to AI_TITLE_LOG
   AI_TITLE_LOG         debug log path (default /tmp/ai-terminal-title.log)
   AI_TITLE_STATE_DIR   per-session state dir (default ~/.cache/ai-terminal-title)
@@ -236,22 +238,14 @@ def main() -> None:
     mode = os.environ.get("AI_TITLE_MODE", "auto").lower()
     every = max(1, int(os.environ.get("AI_TITLE_EVERY", "5")))
 
-    # Turn 1: instant deterministic rename (no LLM wait, no cost).
-    if turn == 1:
+    if mode == "trunc":
         write_title(f"{prefix}{tag}{prompt[:limit]}")
-        log(f"turn 1 deterministic: {prompt[:limit]}")
+        log(f"trunc mode: {prompt[:limit]}")
         return
 
-    # Cadence match: background LLM summary.
-    if (turn - 1) % every == 0 and mode != "trunc":
+    if turn == 1 or (turn - 1) % every == 0:
         spawn_llm_worker(sfile)
-        log(f"spawned llm worker for {sfile}")
-        return
-
-    # Off-cycle: optionally rename deterministically every turn.
-    if os.environ.get("AI_TITLE_EVERY_TURN") == "1":
-        write_title(f"{prefix}{tag}{prompt[:limit]}")
-        log(f"off-cycle deterministic: {prompt[:limit]}")
+        log(f"spawned llm worker (turn {turn})")
 
 
 if __name__ == "__main__":
