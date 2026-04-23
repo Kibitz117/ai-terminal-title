@@ -66,11 +66,19 @@ Full example at [`examples/claude-settings.json`](examples/claude-settings.json)
 
 ### Codex CLI
 
-1. Enable the experimental hooks feature in `~/.codex/config.toml`:
+> **Important:** Codex ships with `tui.terminal_title = ["spinner", "project"]`
+> which makes the CLI continuously re-render the tab title and clobber any
+> OSC escape this hook emits. You **must** disable it or the rename will be
+> invisible.
+
+1. Enable hooks and disable Codex's own title writer in `~/.codex/config.toml`:
 
    ```toml
    [features]
    codex_hooks = true
+
+   [tui]
+   terminal_title = []
    ```
 
 2. Create `~/.codex/hooks.json`:
@@ -140,6 +148,13 @@ Your terminal tab should briefly flash to `[C] refactor the bot pipeline`.
   rewrite the title on each command. The hook resets it on the next prompt.
 - **Codex hook never fires** — confirm `codex_hooks = true` is set and
   restart the CLI. Codex hooks are experimental and require the feature flag.
+- **Codex: hook fires but title snaps back to `codex-…`** — you forgot
+  `tui.terminal_title = []`. Codex's default title writer wins any race
+  against the OSC escape.
+- **Codex 0.117.0–0.121.x:** hook stdout is swallowed in the TUI path
+  ([#15984](https://github.com/openai/codex/issues/15984)). This hook
+  bypasses that by writing straight to `/dev/tty`, so it is unaffected —
+  but other hooks that rely on stdout developer-context may be.
 - **Want an LLM-generated title instead of truncation** — fork and swap the
   inline `python3` block for a call to your model of choice. Keep the hook
   under its timeout or the parent agent will warn.
